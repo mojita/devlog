@@ -1,0 +1,63 @@
+services:
+  seaweedfs:
+    image: chrislusf/seaweedfs:3.80
+    container_name: mp-test-seaweed
+    restart: unless-stopped
+    command: 'server -dir=/data -master.volumeSizeLimitMB=2048 -s3 -s3.port=8333 -s3.config=/etc/sw/s3.json'
+    volumes:
+      - ./seaweed-data:/data
+      - ./seaweed-conf:/etc/sw
+    ports:
+      - "127.0.0.1:8333:8333"   # S3 API,容器网络内 seaweedfs:8333
+      - "127.0.0.1:9333:9333"   # master/web 管理面
+
+  postgres:
+    image: postgres:16
+    container_name: mp-test-pg
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${PG_USER:-metrics}
+      - POSTGRES_PASSWORD=${PG_PASSWORD}
+      - POSTGRES_DB=${PG_DB:-metrics}
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+    ports:
+      - "127.0.0.1:5432:5432"   # 仅本机监听,外部走 SSH 隧道
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-metrics} -d ${PG_DB:-metrics}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  cube:
+    image: cubejs/cube:v1.7.22
+    container_name: mp-test-cube
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:4000:4000"     # REST/Playground,SSH 隧道访问
+      - "127.0.0.1:15432:15432"   # SQL API
+    environment:
+      - CUBEJS_DB_TYPE=postgres
+      - CUBEJS_DB_HOST=postgres
+      - CUBEJS_DB_PORT=5432
+      - CUBEJS_DB_NAME=${PG_DB:-metrics}
+      - CUBEJS_DB_USER=${PG_USER:-metrics}
+      - CUBEJS_DB_PASS=${PG_PASSWORD}
+      - CUBEJS_API_SECRET=${CUBE_API_SECRET}
+      # 模型路径不设:默认约定 /cube/conf/model/ 子目录(KX-002,显式设 SCHEMA_PATH 反而不加载)
+      - CUBEJS_DEV_MODE=true            # 先 dev 模式起步(与 106 同习惯);TP-119 时切生产模式验证重载
+      - CUBEJS_SCHEDULED_REFRESH=true
+      - CUBEJS_TELEMETRY=false
+      # 预聚合远端存储 → SeaweedFS S3(TP-115)
+      # v1.7.22 实测:通用 S3 兼容后端用 CUBESTORE_MINIO_* 系(名不副实但就是通用变量);
+      # CUBESTORE_S3_* 是 AWS 原生专用(凭证走 AWS SDK 链,填了会 panic),KX-033 已纠错
+      - CUBESTORE_MINIO_SERVER_ENDPOINT=http://seaweedfs:8333   # 必须带 http:// 前缀,缺省按 https 握手直接报 SSL 错
+      - CUBESTORE_MINIO_BUCKET=cube-store
+      - CUBESTORE_MINIO_REGION=us-east-1
+      - CUBESTORE_MINIO_ACCESS_KEY_ID=cubetest
+      - CUBESTORE_MINIO_SECRET_ACCESS_KEY=${SW_SECRET}
+    volumes:
+      - ./model:/cube/conf              # 模型目录=.cubestore 所在(106 同款,部署只同步 model/*.yaml)

@@ -1,0 +1,29 @@
+name: deploy-test
+
+# TASK-0007: test 环境部署流水线(模型=文件同步,不构建镜像)
+# 触发: main 上模型/环境定义变更,或手动运行
+on:
+  push:
+    branches: [main]
+    paths: ['model/**', 'deploy/test/**', '.github/workflows/deploy-test.yml']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: [self-hosted, test]
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 装门禁依赖
+        run: pip3 install -q pyyaml -i https://pypi.tuna.tsinghua.edu.cn/simple
+
+      - name: 门禁(模型结构校验)
+        run: python3 scripts/gate.py
+
+      - name: 部署(备份→同步→重启→冒烟→失败回滚)
+        run: bash scripts/deploy-test.sh "$GITHUB_WORKSPACE"
+
+      - name: 记录部署版本
+        if: success()
+        run: echo "$(date +%Y%m%d%H%M%S) $GITHUB_SHA deploy" >> /opt/metrics-platform/DEPLOY_LOG
