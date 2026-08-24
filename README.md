@@ -12,3 +12,7 @@
 
 - 一篇一个目录:`notes/YYYY-MM-主题/`,含 `README.md` 正文与附带脚本/数据
 - 实验类文章必须带**可复现命令与原始输出**,拒绝只有结论
+
+## 文章索引
+
+- 2026-08 [从零在阿里云 CentOS 7 上搭建 Cube 语义层测试环境(含 CI/CD 与对象存储)](notes/2026-08-aliyun-cube-test-env/)——四服务一页纸 compose、三次 panic 排障史、GitOps 金丝雀验证、11 坑速查表与重开机器 runbook
