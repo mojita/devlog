@@ -16,3 +16,4 @@
 ## 文章索引
 
 - 2026-08 [从零在阿里云 CentOS 7 上搭建 Cube 语义层测试环境(含 CI/CD 与对象存储)](notes/2026-08-aliyun-cube-test-env/)——四服务一页纸 compose、三次 panic 排障史、GitOps 金丝雀验证、11 坑速查表与重开机器 runbook
+- 2026-08 [垂直切片实录:一条查询从 AI 会话到浏览器图表](notes/2026-08-vertical-slice/)——Cube v1.7.22 三入口数值一致性验证、prod 模式预聚合命中信号实测、网关 p95 测法修正、CI 门禁首接三坑
